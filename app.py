@@ -1,16 +1,77 @@
 import base64
 import io
-from flask import Flask, jsonify, redirect, render_template, request, url_for
-import matplotlib
+import math
+import os
+from collections import defaultdict
 
-matplotlib.use("Agg")
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
+from matplotlib.figure import Figure
+
 import database as db
-import matplotlib.pyplot as plt
 from services import fetch_world_bank_data
 
 app = Flask(__name__)
 
 db.init_db()
+
+FIELDS = ("country_code", "country_name", "indicator_name", "value", "year")
+TEXT_FIELDS = ("country_code", "country_name", "indicator_name")
+
+# indicator -> (axis label, divisor applied to values on the chart)
+INDICATOR_UNITS = {
+    "GDP": ("Billions USD", 1e9),
+    "Population": ("Millions", 1e6),
+    "Inflation": ("% per year", 1.0),
+}
+
+
+class ValidationError(ValueError):
+    """Raised when incoming data is missing or has the wrong type."""
+
+
+def clean_fields(data, partial=False):
+    """Validate and normalize indicator fields from a form or JSON body.
+
+    With partial=True only the fields that are present are checked (PATCH).
+    """
+    cleaned = {}
+    for field in FIELDS:
+        if field not in data or data[field] is None:
+            if partial:
+                continue
+            raise ValidationError(f"Missing field: {field}")
+
+        raw = data[field]
+
+        if field in TEXT_FIELDS:
+            if not isinstance(raw, str) or not raw.strip():
+                raise ValidationError(f"Invalid {field}")
+            text = raw.strip()
+            cleaned[field] = text.upper() if field == "country_code" else text
+
+        elif field == "value":
+            try:
+                if isinstance(raw, bool):
+                    raise ValueError
+                number = float(raw)
+            except (TypeError, ValueError):
+                raise ValidationError("Invalid value: must be a number")
+            if not math.isfinite(number):
+                raise ValidationError("Invalid value: must be a finite number")
+            cleaned[field] = number
+
+        else:  # year
+            try:
+                if isinstance(raw, bool):
+                    raise ValueError
+                year = int(str(raw).strip())
+            except ValueError:
+                raise ValidationError("Invalid year: must be an integer")
+            if not 1900 <= year <= 2100:
+                raise ValidationError("Invalid year: must be between 1900 and 2100")
+            cleaned[field] = year
+
+    return cleaned
 
 
 def generate_chart(records, selected_countries=None, target_indicator=None):
@@ -28,28 +89,23 @@ def generate_chart(records, selected_countries=None, target_indicator=None):
 
     if selected_countries:
         filtered_records = [
-            item
-            for item in filtered_records
-            if item["country_name"] in selected_countries
+            item for item in filtered_records if item["country_name"] in selected_countries
         ]
 
     if not filtered_records:
         return None
 
-    grouped_data = {}
+    indicator_name = filtered_records[0]["indicator_name"]
+    unit_label, scale_factor = INDICATOR_UNITS.get(indicator_name, ("Value", 1.0))
+
+    grouped_data = defaultdict(list)
     for item in filtered_records:
-        c_name = item["country_name"]
-        if c_name not in grouped_data:
-            grouped_data[c_name] = []
-        grouped_data[c_name].append(item)
+        grouped_data[item["country_name"]].append(item)
 
-    plt.figure(figsize=(9, 4.5))
-
-    scale_factor = 1.0
-    unit_label = "Value"
-    if target_indicator in ["GDP", "Population"]:
-        scale_factor = 1e9
-        unit_label = "Billions" if target_indicator == "GDP" else "Millions / Billions"
+    # Figure() is used instead of pyplot: no global state, safe for Flask threads,
+    # and nothing has to be closed manually.
+    fig = Figure(figsize=(9, 4.5))
+    ax = fig.subplots()
 
     for c_name, c_records in grouped_data.items():
         sorted_c = sorted(c_records, key=lambda x: x["year"])
@@ -57,33 +113,28 @@ def generate_chart(records, selected_countries=None, target_indicator=None):
         values = [x["value"] / scale_factor for x in sorted_c]
 
         if len(years) == 1:
-            plt.scatter(years, values, label=c_name, s=80, zorder=3)
+            ax.scatter(years, values, label=c_name, s=80, zorder=3)
         else:
-            plt.plot(years, values, marker="o", linewidth=2, label=c_name)
+            ax.plot(years, values, marker="o", linewidth=2, label=c_name)
 
-    plt.title(f"Comparison - {target_indicator}")
-    plt.xlabel("Year")
-    plt.ylabel(unit_label)
-    plt.legend(loc="best")
-    plt.grid(True, linestyle="--", alpha=0.6)
-
-    ax = plt.gca()
+    ax.set_title(f"Comparison - {indicator_name}")
+    ax.set_xlabel("Year")
+    ax.set_ylabel(unit_label)
+    ax.legend(loc="best")
+    ax.grid(True, linestyle="--", alpha=0.6)
     ax.ticklabel_format(style="plain", axis="y")
-
-    plt.tight_layout()
+    fig.tight_layout()
 
     buffer = io.BytesIO()
-    plt.savefig(buffer, format="png")
-    buffer.seek(0)
-    chart_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    plt.close()
-    return chart_base64
+    fig.savefig(buffer, format="png")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 @app.route("/")
 def index():
     country = request.args.get("country", "").strip()
     indicator = request.args.get("indicator", "GDP")
+
     results = []
     error = None
 
@@ -101,14 +152,23 @@ def index():
 
 @app.route("/save", methods=["POST"])
 def save_record():
-    c_code = request.form.get("country_code")
-    c_name = request.form.get("country_name")
-    i_name = request.form.get("indicator_name")
-    val = float(request.form.get("value"))
-    yr = int(request.form.get("year"))
+    try:
+        fields = clean_fields(request.form)
+    except ValidationError as exc:
+        abort(400, str(exc))
 
-    db.add_indicator(c_code, c_name, i_name, val, yr)
-    return redirect(url_for("index", country=c_code, indicator=i_name))
+    try:
+        db.add_indicator(**fields)
+    except db.DuplicateRecordError:
+        pass  # already saved, nothing to do
+
+    return redirect(
+        url_for(
+            "index",
+            country=fields["country_code"],
+            indicator=fields["indicator_name"],
+        )
+    )
 
 
 @app.route("/saved")
@@ -119,12 +179,8 @@ def saved_list():
 
     records = db.get_all_indicators(search_query=search if search else None)
 
-    unique_countries = (
-        sorted(list({r["country_name"] for r in records})) if records else []
-    )
-    unique_indicators = (
-        sorted(list({r["indicator_name"] for r in records})) if records else []
-    )
+    unique_countries = sorted({r["country_name"] for r in records})
+    unique_indicators = sorted({r["indicator_name"] for r in records})
 
     chart = None
     if records:
@@ -153,20 +209,16 @@ def edit_item(item_id):
         return redirect(url_for("saved_list"))
 
     if request.method == "POST":
-        c_code = request.form.get("country_code")
-        c_name = request.form.get("country_name")
-        i_name = request.form.get("indicator_name")
-        val = float(request.form.get("value"))
-        yr = int(request.form.get("year"))
+        try:
+            fields = clean_fields(request.form)
+        except ValidationError as exc:
+            abort(400, str(exc))
 
-        db.update_indicator(
-            item_id,
-            country_code=c_code,
-            country_name=c_name,
-            indicator_name=i_name,
-            value=val,
-            year=yr,
-        )
+        try:
+            db.update_indicator(item_id, **fields)
+        except db.DuplicateRecordError:
+            abort(409, "A record for this country, indicator and year already exists")
+
         return redirect(url_for("saved_list"))
 
     return render_template("edit.html", item=item)
@@ -183,8 +235,7 @@ def delete_item(item_id):
 
 @app.route("/api/indicators", methods=["GET"])
 def api_get_all():
-    records = db.get_all_indicators()
-    return jsonify(records), 200
+    return jsonify(db.get_all_indicators()), 200
 
 
 @app.route("/api/indicators/<int:item_id>", methods=["GET"])
@@ -197,55 +248,54 @@ def api_get_one(item_id):
 
 @app.route("/api/indicators", methods=["POST"])
 def api_create():
-    data = request.get_json()
-    if not data or not all(
-        k in data
-        for k in ("country_code", "country_name", "indicator_name", "value", "year")
-    ):
-        return jsonify({"error": "Missing required fields"}), 400
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
 
-    new_id = db.add_indicator(
-        data["country_code"],
-        data["country_name"],
-        data["indicator_name"],
-        float(data["value"]),
-        int(data["year"]),
-    )
+    try:
+        fields = clean_fields(data)
+    except ValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
 
-    if new_id is None:
-        return jsonify({"error": "Record already exists"}), 400
+    try:
+        new_id = db.add_indicator(**fields)
+    except db.DuplicateRecordError:
+        return jsonify({"error": "Record already exists"}), 409
 
-    created_item = db.get_indicator_by_id(new_id)
-    return jsonify(created_item), 201
+    return jsonify(db.get_indicator_by_id(new_id)), 201
 
 
 @app.route("/api/indicators/<int:item_id>", methods=["PATCH"])
 def api_update(item_id):
-    data = request.get_json()
-    if not data:
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data:
         return jsonify({"error": "Invalid input data"}), 400
 
-    success = db.update_indicator(
-        item_id,
-        country_code=data.get("country_code"),
-        country_name=data.get("country_name"),
-        indicator_name=data.get("indicator_name"),
-        value=data.get("value"),
-        year=data.get("year"),
-    )
+    try:
+        fields = clean_fields(data, partial=True)
+    except ValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if not fields:
+        return jsonify({"error": "No valid fields to update"}), 400
+
+    try:
+        success = db.update_indicator(item_id, **fields)
+    except db.DuplicateRecordError:
+        return jsonify({"error": "Record already exists"}), 409
+
     if success:
-        updated_item = db.get_indicator_by_id(item_id)
-        return jsonify(updated_item), 200
+        return jsonify(db.get_indicator_by_id(item_id)), 200
     return jsonify({"error": "Record not found"}), 404
 
 
 @app.route("/api/indicators/<int:item_id>", methods=["DELETE"])
 def api_delete(item_id):
-    success = db.delete_indicator(item_id)
-    if success:
+    if db.delete_indicator(item_id):
         return jsonify({"message": "Record deleted successfully"}), 200
     return jsonify({"error": "Record not found"}), 404
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Debug mode only when explicitly enabled: FLASK_DEBUG=1 python app.py
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
