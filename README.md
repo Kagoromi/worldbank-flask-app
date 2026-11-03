@@ -20,17 +20,21 @@ A robust Flask-based web application that integrates with the public World Bank 
 
 ## Project Structure
 
+```
 .
 ├── static/
-│   └── style.css/          # Custom styles extending Bootstrap 5
-├── templates/              # Jinja2 HTML templates
-│   ├── base.html           # Base layout template with Bootstrap setup & navigation
-│   ├── index.html          # Search interface for external World Bank API data
-│   └── saved.html          # View, search filter, and chart visualization for saved records
-├── app.py                  # Main Flask application & REST API routes
-├── database.py             # SQLite helper module & parameterized queries
-├── requirements.txt        # Project dependencies
+│   └── style.css          # Custom styles extending Bootstrap 5
+├── templates/             # Jinja2 HTML templates
+│   ├── base.html          # Base layout template with Bootstrap setup & navigation
+│   ├── index.html         # Search interface for external World Bank API data
+│   ├── saved.html         # View, search filter, and chart visualization for saved records
+│   └── edit.html          # Form interface for updating existing database records
+├── app.py                 # Main Flask application & REST API routes
+├── database.py            # SQLite helper module & parameterized SQL queries
+├── services.py            # External World Bank API integration & data parsing service
+├── requirements.txt       # Project dependencies
 └── README.md
+```
 
 ## Database Schema
 
