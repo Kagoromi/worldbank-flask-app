@@ -10,6 +10,9 @@ A robust Flask-based web application that integrates with the public World Bank 
 - RESTful API: Exposes structured JSON endpoints supporting full CRUD operations on stored indicator records.
 - User-Friendly Interface: Features a responsive Bootstrap 5 interface enhanced with custom CSS styling, intuitive data table visualization, and action triggers.
 
+## Preview
+<img width="914" height="943" alt="зображення" src="https://github.com/user-attachments/assets/3bc5b8bc-7030-4698-8f5c-d537c587aba6" />
+
 ## Tech Stack
 
 - Backend: Python 3, Flask
