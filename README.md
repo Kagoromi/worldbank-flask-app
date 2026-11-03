@@ -21,7 +21,6 @@ A robust Flask-based web application that integrates with the public World Bank 
 ## Project Structure
 
 ```
-.
 ├── static/
 │   └── style.css          # Custom styles extending Bootstrap 5
 ├── templates/             # Jinja2 HTML templates
