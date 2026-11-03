@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-3">Saved Database Records</h2>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <form method="GET" action="/saved" class="d-flex gap-2">
+            <input type="text" name="search" class="form-control" placeholder="Search by country or code..." value="{{ search }}">
+            <button type="submit" class="btn btn-secondary">Search</button>
+        </form>
+    </div>
+</div>
+
+{% if records %}
+    <div class="card p-3 mb-4">
+        <h5 class="card-title mb-3">Chart Comparison Controls</h5>
+        <form method="GET" action="/saved" class="row g-3">
+            {% if search %}
+                <input type="hidden" name="search" value="{{ search }}">
+            {% endif %}
+            
+            <div class="col-md-4">
+                <label class="form-label text-muted small mb-1">Select Indicator</label>
+                <select name="chart_indicator" class="form-select">
+                    {% for ind in unique_indicators %}
+                        <option value="{{ ind }}" {% if selected_indicator == ind %}selected{% endif %}>{{ ind }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-8">
+                <label class="form-label text-muted small mb-1">Select Countries to Compare (leave empty for all)</label>
+                <div class="d-flex flex-wrap gap-3 p-2 border rounded bg-white">
+                    {% for c in unique_countries %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="chart_countries" value="{{ c }}" id="c_{{ loop.index }}" {% if not selected_countries or c in selected_countries %}checked{% endif %}>
+                            <label class="form-check-label" for="c_{{ loop.index }}">{{ c }}</label>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-12 text-end mt-3">
+                <button type="submit" class="btn btn-primary">Compare on Chart</button>
+            </div>
+        </form>
+    </div>
+
+    {% if chart %}
+        <div class="card p-3 mb-4 chart-container text-center">
+            <img src="data:image/png;base64,{{ chart }}" alt="Data Chart">
+        </div>
+    {% else %}
+        <div class="alert alert-warning">No data found for selected chart filters.</div>
+    {% endif %}
+
+    <table class="table table-bordered table-hover">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>ID</th>
+                <th>Country</th>
+                <th>Indicator</th>
+                <th>Value</th>
+                <th>Year</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in records %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><small class="text-muted">#{{ row.id }}</small></td>
+                <td>{{ row.country_name }} ({{ row.country_code }})</td>
+                <td>{{ row.indicator_name }}</td>
+                <td>{{ row.value }}</td>
+                <td>{{ row.year }}</td>
+                <td>
+                    <div class="d-flex gap-1">
+                        <a href="/edit/{{ row.id }}" class="btn btn-sm btn-warning">Edit</a>
+                        <form method="POST" action="/delete/{{ row.id }}">
+                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-muted">No records found in local database.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,25 @@
+/* Custom styles for World Bank Data Explorer */
+
+body {
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+.navbar-brand {
+    font-weight: 600;
+}
+
+.card {
+    border-radius: 8px;
+    border: 1px solid #e3e6f0;
+}
+
+.table th {
+    background-color: #e9ecef;
+}
+
+.chart-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+}

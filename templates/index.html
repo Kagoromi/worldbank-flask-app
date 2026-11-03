@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-3">Search World Bank API</h2>
+
+<form method="GET" action="/" class="row g-3 mb-4">
+    <div class="col-md-5">
+        <input type="text" name="country" class="form-control" placeholder="Enter country code (e.g. UKR, USA)" value="{{ country }}" required>
+    </div>
+    <div class="col-md-4">
+        <select name="indicator" class="form-select">
+            <option value="GDP" {% if indicator == 'GDP' %}selected{% endif %}>GDP</option>
+            <option value="Population" {% if indicator == 'Population' %}selected{% endif %}>Population</option>
+            <option value="Inflation" {% if indicator == 'Inflation' %}selected{% endif %}>Inflation</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">Fetch Data</button>
+    </div>
+</form>
+
+{% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if results %}
+    <h4>API Results</h4>
+    <table class="table table-bordered table-striped mt-3">
+        <thead>
+            <tr>
+                <th>Country</th>
+                <th>Indicator</th>
+                <th>Value</th>
+                <th>Year</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in results %}
+            <tr>
+                <td>{{ item.country_name }} ({{ item.country_code }})</td>
+                <td>{{ item.indicator_name }}</td>
+                <td>{{ item.value }}</td>
+                <td>{{ item.year }}</td>
+                <td>
+                    {% if item.is_saved %}
+                        <button class="btn btn-sm btn-secondary" disabled>Already Saved</button>
+                    {% else %}
+                        <form method="POST" action="/save">
+                            <input type="hidden" name="country_code" value="{{ item.country_code }}">
+                            <input type="hidden" name="country_name" value="{{ item.country_name }}">
+                            <input type="hidden" name="indicator_name" value="{{ item.indicator_name }}">
+                            <input type="hidden" name="value" value="{{ item.value }}">
+                            <input type="hidden" name="year" value="{{ item.year }}">
+                            <button type="submit" class="btn btn-sm btn-success">Save</button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+{% endblock %}
