@@ -12,6 +12,9 @@ A robust Flask-based web application that integrates with the public World Bank 
 - Automated Tests: A pytest suite covering the REST API, validation rules and duplicate handling.
 - User-Friendly Interface: Features a responsive Bootstrap 5 interface enhanced with custom CSS styling, intuitive data table visualization, and action triggers.
 
+## Preview
+<img width="914" height="943" alt="зображення" src="https://github.com/user-attachments/assets/3bc5b8bc-7030-4698-8f5c-d537c587aba6" />
+
 ## Tech Stack
 
 - Backend: Python 3, Flask
@@ -24,40 +27,19 @@ A robust Flask-based web application that integrates with the public World Bank 
 ## Project Structure
 
 ```
-.
 ├── static/
-│   └── style.css
-├── templates/
-│   ├── base.html
-│   ├── edit.html
-│   ├── index.html
-│   └── saved.html
-├── tests/
-│   ├── conftest.py
-│   └── test_api.py
-├── .gitignore
-├── app.py
-├── database.py
-├── README.md
-├── requirements.txt
-└── services.py
+│   └── style.css          # Custom styles extending Bootstrap 5
+├── templates/             # Jinja2 HTML templates
+│   ├── base.html          # Base layout template with Bootstrap setup & navigation
+│   ├── index.html         # Search interface for external World Bank API data
+│   ├── saved.html         # View, search filter, and chart visualization for saved records
+│   └── edit.html          # Form interface for updating existing database records
+├── app.py                 # Main Flask application & REST API routes
+├── database.py            # SQLite helper module & parameterized SQL queries
+├── services.py            # External World Bank API integration & data parsing service
+├── requirements.txt       # Project dependencies
+└── README.md
 ```
-
-| File | Purpose |
-|------|---------|
-| `app.py` | Main Flask application: web routes, input validation and REST API endpoints |
-| `database.py` | SQLite helper module with parameterized queries |
-| `services.py` | World Bank API integration and response parsing |
-| `templates/base.html` | Base layout with Bootstrap setup and navigation |
-| `templates/index.html` | Search interface for World Bank API data |
-| `templates/saved.html` | Saved records: search filter and chart visualization |
-| `templates/edit.html` | Form for updating an existing record |
-| `static/style.css` | Custom styles extending Bootstrap 5 |
-| `tests/conftest.py` | Shared pytest fixtures (test client, temporary database) |
-| `tests/test_api.py` | Tests for the REST API, validation and duplicate handling |
-| `requirements.txt` | Project dependencies |
-
-The SQLite database file `worldbank.db` is created automatically on the first run and is not stored in the repository.
 
 ## Database Schema
 
@@ -99,15 +81,3 @@ Validation rules: `value` must be a finite number, `year` must be an integer bet
 3. Install required dependencies using `pip install -r requirements.txt`.
 4. Run the application using `python app.py`.
 5. Open `http://127.0.0.1:5000` in your web browser.
-
-To run in debug mode during development, set the environment variable `FLASK_DEBUG=1` before starting the app.
-
-## Running Tests
-
-From the project root, run:
-
-```bash
-pytest
-```
-
-Tests use a temporary database, so your local `worldbank.db` is never touched.
