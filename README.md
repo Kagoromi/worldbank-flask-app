@@ -13,7 +13,7 @@ A robust Flask-based web application that integrates with the public World Bank 
 - User-Friendly Interface: Features a responsive Bootstrap 5 interface enhanced with custom CSS styling, intuitive data table visualization, and action triggers.
 
 ## Preview
-<img width="914" height="943" alt="зображення" src="https://github.com/user-attachments/assets/3bc5b8bc-7030-4698-8f5c-d537c587aba6" />
+<img width="918" height="912" alt="зображення" src="https://github.com/user-attachments/assets/2032213b-4d6a-4e90-accb-11cbeec4c6a8" />
 
 ## Tech Stack
 
